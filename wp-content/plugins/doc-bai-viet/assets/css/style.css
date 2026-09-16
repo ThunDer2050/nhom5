@@ -1,0 +1,177 @@
+/**
+ * ============================================================
+ * CSS CHO PLUGIN ĐỌC BÀI VIẾT
+ * ============================================================
+ * File này định nghĩa giao diện cho khu vực điều khiển
+ * đọc bài viết. Sử dụng prefix 'dbv-' cho tất cả class
+ * để tránh xung đột với Theme hoặc plugin khác.
+ */
+
+/* --- Container chính --- */
+.dbv-player {
+    margin: 30px 0;
+    padding: 20px 24px;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-left: 4px solid #0073aa;
+    border-radius: 6px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+/* --- Tiêu đề khu vực --- */
+.dbv-header {
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.dbv-icon {
+    font-size: 20px;
+    vertical-align: middle;
+}
+
+.dbv-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #1d2327;
+    vertical-align: middle;
+}
+
+/* --- Khu vực các nút điều khiển --- */
+.dbv-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+/* --- Style chung cho tất cả nút --- */
+.dbv-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 18px;
+    font-size: 14px;
+    font-weight: 500;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s ease, opacity 0.2s ease;
+    color: #ffffff;
+    line-height: 1.4;
+}
+
+/* Khi nút bị vô hiệu hóa */
+.dbv-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* --- Màu riêng cho từng nút --- */
+
+/* Nút Đọc - xanh dương */
+.dbv-btn-doc {
+    background-color: #0073aa;
+}
+.dbv-btn-doc:hover:not(:disabled) {
+    background-color: #005a87;
+}
+
+/* Nút Tạm dừng - vàng cam */
+.dbv-btn-tam-dung {
+    background-color: #dba617;
+}
+.dbv-btn-tam-dung:hover:not(:disabled) {
+    background-color: #c49212;
+}
+
+/* Nút Tiếp tục - xanh lá */
+.dbv-btn-tiep-tuc {
+    background-color: #00a32a;
+}
+.dbv-btn-tiep-tuc:hover:not(:disabled) {
+    background-color: #008a20;
+}
+
+/* Nút Dừng - đỏ */
+.dbv-btn-dung {
+    background-color: #d63638;
+}
+.dbv-btn-dung:hover:not(:disabled) {
+    background-color: #b32d2e;
+}
+
+/* --- Thanh điều chỉnh tốc độ --- */
+.dbv-speed {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+    font-size: 14px;
+    color: #50575e;
+}
+
+.dbv-speed label {
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+#dbv-speed-range {
+    width: 150px;
+    cursor: pointer;
+    accent-color: #0073aa;
+}
+
+#dbv-speed-value {
+    font-weight: 600;
+    color: #1d2327;
+    min-width: 35px;
+}
+
+/* --- Khu vực hiển thị trạng thái --- */
+.dbv-status {
+    font-size: 14px;
+    color: #50575e;
+    padding: 8px 12px;
+    background-color: #ffffff;
+    border: 1px solid #e2e4e7;
+    border-radius: 4px;
+}
+
+#dbv-status-text {
+    font-weight: 600;
+    color: #1d2327;
+}
+
+/* --- Khu vực thông báo lỗi --- */
+.dbv-thong-bao {
+    margin-top: 12px;
+    padding: 10px 14px;
+    background-color: #fcf0f1;
+    border: 1px solid #d63638;
+    border-radius: 4px;
+    color: #d63638;
+    font-size: 14px;
+}
+
+/* --- Responsive cho màn hình nhỏ --- */
+@media screen and (max-width: 480px) {
+    .dbv-player {
+        padding: 16px;
+    }
+
+    .dbv-controls {
+        flex-direction: column;
+    }
+
+    .dbv-btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    #dbv-speed-range {
+        width: 100px;
+    }
+}
