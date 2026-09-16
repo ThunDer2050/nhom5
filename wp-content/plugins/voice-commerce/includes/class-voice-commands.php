@@ -27,34 +27,45 @@ class VC_Voice_Commands {
         'zoom_in'        => [ ['phong to chu','chu to hon','tang co chu','phong to'], ['zoom in','larger text','increase font'] ],
         'zoom_out'       => [ ['thu nho chu','chu nho hon','giam co chu','thu nho'], ['zoom out','smaller text','decrease font'] ],
         'zoom_reset'     => [ ['co chu chuan','chu binh thuong','khoi phuc co chu'], ['reset zoom','normal text','reset font'] ],
-        'toggle_menu'    => [ ['mo menu','menu lenh','danh muc lenh','tat menu'], ['open menu','show menu','command menu','menu'] ],
-        'stop'           => [ ['dung lai','dung','tat','thoi'], ['stop','stop listening','cancel','quit'] ],
+        'accessibility_mode' => [ ['che do khiem thi','khiem thi','ho tro khiem thi','tro nang','che do nguoi mu','tat che do khiem thi','bat che do khiem thi','che do tiep can'], ['accessibility mode','blind mode','accessibility','assistive mode'] ],
+        'read_products'      => [ ['doc san pham','danh sach san pham','doc cac san pham','doc hang hoa','co nhung san pham nao'], ['read products','list products','speak products'] ],
+        'cart_summary'       => [ ['kiem tra gio hang','doc gio hang','co bao nhieu mon','tong tien gio hang','kiem tra gio'], ['cart summary','check cart','how many items'] ],
+        'high_contrast'      => [ ['tuong phan cao','che do tuong phan','do tuong phan cao','mau tuong phan'], ['high contrast','contrast mode','toggle contrast'] ],
+        'stop'               => [ ['dung lai','dung','tat','thoi','im lang'], ['stop','stop listening','cancel','quit','silence'] ],
     ];
 
     public static function parse( string $transcript ): array {
         $lower = mb_strtolower( trim( $transcript ) );
-        // Remove Vietnamese diacritics for flexible matching
         $ascii = self::remove_accents( $lower );
+
+        $best_match = null;
+        $best_len   = 0;
 
         foreach ( self::$commands as $action => $lang_groups ) {
             foreach ( $lang_groups as $phrases ) {
                 foreach ( $phrases as $phrase ) {
-                    $match_pos = strpos( $ascii, self::remove_accents( $phrase ) );
+                    $phrase_ascii = self::remove_accents( $phrase );
+                    $match_pos = strpos( $ascii, $phrase_ascii );
                     if ( $match_pos !== false ) {
-                        $keyword = ( 'search' === $action || 'add_to_cart' === $action )
-                            ? trim( substr( $lower, $match_pos + strlen( $phrase ) ) )
-                            : null;
-                        return [
-                            'action'   => $action,
-                            'keyword'  => $keyword,
-                            'quantity' => 1,
-                            'matched'  => $phrase
-                        ];
+                        $len = strlen( $phrase_ascii );
+                        if ( $len > $best_len ) {
+                            $best_len = $len;
+                            $keyword = ( 'search' === $action || 'add_to_cart' === $action )
+                                ? trim( substr( $lower, $match_pos + strlen( $phrase ) ) )
+                                : null;
+                            $best_match = [
+                                'action'   => $action,
+                                'keyword'  => $keyword,
+                                'quantity' => 1,
+                                'matched'  => $phrase
+                            ];
+                        }
                     }
                 }
             }
         }
-        return [ 'action' => 'unknown', 'keyword' => null, 'quantity' => 1, 'matched' => null ];
+
+        return $best_match ?? [ 'action' => 'unknown', 'keyword' => null, 'quantity' => 1, 'matched' => null ];
     }
 
     public static function remove_accents( string $str ): string {

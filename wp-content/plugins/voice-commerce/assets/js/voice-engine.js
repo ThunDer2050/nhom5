@@ -7,23 +7,30 @@
     var recognition = null;
     var isListening = false;
     var panelOpen   = false;
-    var toastTimer  = null;
-    var ttsEnabled  = (localStorage.getItem('vc_tts_enabled') !== 'false');
-    var currentZoom = 100;
+    var toastTimer       = null;
+    var ttsEnabled       = (localStorage.getItem('vc_tts_enabled') !== 'false');
+    var a11yActive       = (localStorage.getItem('vc_a11y_mode') === 'true');
+    var highContrast     = (localStorage.getItem('vc_high_contrast') === 'true');
+    var currentZoom      = 100;
+    var a11yDebounce    = null;
 
     // Elements
-    var $wrapper    = $('#vc-wrapper');
-    var $micBtn     = $('#vc-mic-btn');
-    var $panel      = $('#vc-panel');
-    var $status     = $('#vc-status');
-    var $transcript = $('#vc-transcript');
-    var $aiReply    = $('#vc-ai-reply');
-    var $result     = $('#vc-result');
-    var $closeBtn   = $('#vc-close-btn');
-    var $toast      = $('#vc-toast');
-    var $ttsToggle  = $('#vc-tts-toggle');
-    var $tabs       = $('.vc-tab-btn');
-    var $tabPanes   = $('.vc-tab-content');
+    var $wrapper          = $('#vc-wrapper');
+    var $micBtn           = $('#vc-mic-btn');
+    var $a11yBtn          = $('#vc-a11y-btn');
+    var $a11yMasterToggle = $('#vc-a11y-master-toggle');
+    var $a11yStatusTag    = $('#vc-a11y-status-tag');
+    var $srLive           = $('#vc-sr-live');
+    var $panel            = $('#vc-panel');
+    var $status           = $('#vc-status');
+    var $transcript       = $('#vc-transcript');
+    var $aiReply          = $('#vc-ai-reply');
+    var $result           = $('#vc-result');
+    var $closeBtn         = $('#vc-close-btn');
+    var $toast            = $('#vc-toast');
+    var $ttsToggle        = $('#vc-tts-toggle');
+    var $tabs             = $('.vc-tab-btn');
+    var $tabPanes         = $('.vc-tab-content');
 
     /* ── Helper Functions ─────────────────────────────────── */
     function esc(s) {
@@ -376,6 +383,22 @@
                 openPanel();
                 break;
 
+            case 'accessibility_mode':
+                toggleAccessibility();
+                break;
+
+            case 'cart_summary':
+                readCartSummary();
+                break;
+
+            case 'read_products':
+                readProductsOnPage();
+                break;
+
+            case 'high_contrast':
+                toggleHighContrast();
+                break;
+
             case 'ai_chat':
                 setStatus('Gemini AI phản hồi', 'success');
                 break;
@@ -510,17 +533,188 @@
         setStatus('Đang đọc nội dung trang...', 'success');
         showToast('Đang đọc bài viết...', 'info');
         speakText(textToRead);
+        announceScreenReader(textToRead);
     }
 
     function stopReadingContent() {
         if (window.speechSynthesis) window.speechSynthesis.cancel();
+        $('.vc-reading-highlight').removeClass('vc-reading-highlight');
         setStatus('Đã dừng đọc giọng nói.', '');
         showToast('Đã dừng đọc', 'info');
+    }
+
+    /* ── Accessibility & Screen Reader (WCAG 2.1) ────────── */
+    function announceScreenReader(msg) {
+        if ($srLive.length && msg) {
+            $srLive.text(msg);
+        }
+    }
+
+    function toggleAccessibility(force) {
+        if (typeof force === 'boolean') {
+            a11yActive = force;
+        } else {
+            a11yActive = !a11yActive;
+        }
+        localStorage.setItem('vc_a11y_mode', a11yActive ? 'true' : 'false');
+        updateA11yUI();
+
+        var msg = a11yActive
+            ? 'Đã bật chế độ hỗ trợ người khiếm thị. Bạn có thể nhấn phím Tab hoặc di chuột để nghe đọc từng mục, hoặc nói vào micro để mua sắm.'
+            : 'Đã tắt chế độ hỗ trợ người khiếm thị.';
+
+        setStatus(a11yActive ? 'Chế độ khiếm thị: ĐANG BẬT' : 'Chế độ khiếm thị: ĐÃ TẮT', 'success');
+        showToast(a11yActive ? 'Đã bật Chế độ Trợ năng (WCAG)' : 'Đã tắt Chế độ Trợ năng', 'info');
+        speakText(msg);
+        announceScreenReader(msg);
+    }
+
+    function updateA11yUI() {
+        if (a11yActive) {
+            $('html').addClass('vc-accessibility-mode');
+            $a11yBtn.addClass('vc-a11y-active');
+            $a11yMasterToggle.addClass('vc-active');
+            $a11yStatusTag.removeClass('vc-a11y-tag-off').addClass('vc-a11y-tag-on').text('Đang Bật');
+        } else {
+            if (!highContrast) $('html').removeClass('vc-accessibility-mode');
+            $a11yBtn.removeClass('vc-a11y-active');
+            $a11yMasterToggle.removeClass('vc-active');
+            $a11yStatusTag.removeClass('vc-a11y-tag-on').addClass('vc-a11y-tag-off').text('Đang Tắt');
+        }
+    }
+
+    function toggleHighContrast(force) {
+        if (typeof force === 'boolean') {
+            highContrast = force;
+        } else {
+            highContrast = !highContrast;
+        }
+        localStorage.setItem('vc_high_contrast', highContrast ? 'true' : 'false');
+        if (highContrast) {
+            $('html').addClass('vc-accessibility-mode');
+            speakText('Đã bật chế độ tương phản cao vàng đen chuẩn WCAG AAA.');
+            showToast('Tương phản cao: Đang bật', 'info');
+        } else {
+            if (!a11yActive) $('html').removeClass('vc-accessibility-mode');
+            speakText('Đã tắt chế độ tương phản cao.');
+            showToast('Tương phản cao: Đã tắt', 'info');
+        }
+    }
+
+    function readCartSummary() {
+        setStatus('Đang kiểm tra giỏ hàng...', 'loading');
+        $.ajax({
+            url: VC.ajaxUrl,
+            type: 'POST',
+            data: { action: 'vc_cart_summary', nonce: VC.nonce },
+            success: function (res) {
+                if (res.success && res.data) {
+                    var sp = res.data.speech;
+                    setStatus('Giỏ hàng: ' + res.data.count + ' món (' + res.data.total + ')', 'success');
+                    showToast('Giỏ hàng: ' + res.data.count + ' sản phẩm', 'info');
+                    speakText(sp);
+                    announceScreenReader(sp);
+                }
+            },
+            error: function () {
+                speakText('Không thể kết nối để kiểm tra giỏ hàng.');
+            }
+        });
+    }
+
+    function readProductsOnPage() {
+        setStatus('Đang đọc danh sách sản phẩm...', 'loading');
+        $.ajax({
+            url: VC.ajaxUrl,
+            type: 'POST',
+            data: { action: 'vc_get_current_products', nonce: VC.nonce },
+            success: function (res) {
+                if (res.success && res.data) {
+                    setStatus('Đang đọc danh sách sản phẩm...', 'success');
+                    showToast('Đang đọc đặc sản...', 'info');
+                    speakText(res.data.speech);
+                    announceScreenReader(res.data.speech);
+                }
+            },
+            error: function () {
+                readPageContent();
+            }
+        });
+    }
+
+    // Auto audio guidance on Tab Focus & Hover for Visually Impaired users
+    $(document).on('focusin mouseenter', 'a, button, input, select, textarea, .woocommerce-loop-product__title, .price, li.product, .entry-title', function (e) {
+        if (!a11yActive) return;
+        var $el = $(this);
+        clearTimeout(a11yDebounce);
+        a11yDebounce = setTimeout(function () {
+            var text = getAccessibleText($el);
+            if (text) {
+                $('.vc-reading-highlight').removeClass('vc-reading-highlight');
+                $el.addClass('vc-reading-highlight');
+                speakText(text);
+                announceScreenReader(text);
+            }
+        }, 180);
+    });
+
+    function getAccessibleText($el) {
+        if ($el.closest('#vc-panel').length && !$el.is('#vc-close-btn')) return null;
+
+        // Product item
+        if ($el.hasClass('product') || $el.closest('li.product').length) {
+            var $p = $el.hasClass('product') ? $el : $el.closest('li.product');
+            var pTitle = $p.find('.woocommerce-loop-product__title').text().trim() || $p.find('h2, h3').text().trim();
+            var pPrice = $p.find('.price').text().trim();
+            if (pTitle) {
+                return 'Sản phẩm: ' + pTitle + (pPrice ? (', Giá ' + pPrice) : '') + '. Nhấn Enter để xem hoặc nói Thêm vào giỏ.';
+            }
+        }
+        if ($el.is('button')) {
+            var btnText = $el.attr('aria-label') || $el.text().trim() || $el.attr('title') || 'Nút bấm';
+            return 'Nút: ' + btnText;
+        }
+        if ($el.is('a')) {
+            var linkText = $el.attr('aria-label') || $el.text().trim() || $el.attr('title');
+            if (linkText) return 'Liên kết: ' + linkText + '. Nhấn Enter để mở.';
+        }
+        if ($el.is('input, textarea')) {
+            var ph = $el.attr('placeholder') || $el.attr('aria-label') || 'Ô nhập văn bản';
+            return 'Ô nhập liệu: ' + ph;
+        }
+        return null;
+    }
+
+    // Initialize saved accessibility state
+    updateA11yUI();
+    if (highContrast) {
+        $('html').addClass('vc-accessibility-mode');
     }
 
     /* ── Event Handlers ──────────────────────────────────── */
     $micBtn.on('click', toggleListening);
     $closeBtn.on('click', closePanel);
+
+    // Floating Accessibility Button
+    $a11yBtn.on('click', function () {
+        openPanel('a11y');
+    });
+
+    // Master toggle in a11y panel
+    $a11yMasterToggle.on('click', function () {
+        toggleAccessibility();
+    });
+
+    // Accessibility action buttons in panel
+    $(document).on('click', '.vc-a11y-action-btn', function () {
+        var act = $(this).data('action');
+        if (act === 'read_page') readPageContent();
+        else if (act === 'cart_summary') readCartSummary();
+        else if (act === 'read_products') readProductsOnPage();
+        else if (act === 'high_contrast') toggleHighContrast();
+        else if (act === 'zoom_in') zoomPage(10);
+        else if (act === 'stop_reading') stopReadingContent();
+    });
 
     // Tab switcher
     $tabs.on('click', function () {
@@ -556,11 +750,32 @@
         handleTranscript(cmd);
     });
 
-    // Alt+M shortcut
+    // Keyboard Shortcuts (WCAG Accessible)
     $(document).on('keydown', function (e) {
+        // Alt + M: Voice Command
         if (e.altKey && (e.key === 'm' || e.key === 'M' || e.keyCode === 77)) {
             e.preventDefault();
             toggleListening();
+        }
+        // Alt + A: Toggle Accessibility Mode
+        else if (e.altKey && (e.key === 'a' || e.key === 'A' || e.keyCode === 65)) {
+            e.preventDefault();
+            toggleAccessibility();
+        }
+        // Alt + R: Read Page Content
+        else if (e.altKey && (e.key === 'r' || e.key === 'R' || e.keyCode === 82)) {
+            e.preventDefault();
+            readPageContent();
+        }
+        // Alt + C: Check Cart Summary
+        else if (e.altKey && (e.key === 'c' || e.key === 'C' || e.keyCode === 67)) {
+            e.preventDefault();
+            readCartSummary();
+        }
+        // Escape: Stop reading & close panel
+        else if (e.key === 'Escape' || e.keyCode === 27) {
+            stopReadingContent();
+            if (panelOpen) closePanel();
         }
     });
 
@@ -571,6 +786,6 @@
         }
     });
 
-    console.info('[Voice Commerce AI v1.2] Loaded. Powered by Google Gemini AI.');
+    console.info('[Voice Commerce AI v1.2] Loaded with WCAG 2.1 Accessibility Mode.');
 
 }(jQuery));

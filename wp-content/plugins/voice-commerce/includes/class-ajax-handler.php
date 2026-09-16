@@ -12,7 +12,9 @@ class VC_Ajax_Handler {
             'vc_clear_cart',
             'vc_get_product',
             'vc_parse_command',
-            'vc_ai_command'
+            'vc_ai_command',
+            'vc_cart_summary',
+            'vc_get_current_products'
         ];
         foreach ( $actions as $action ) {
             add_action( 'wp_ajax_' . $action,        [ $this, 'handle_' . str_replace( 'vc_', '', $action ) ] );
@@ -232,5 +234,74 @@ class VC_Ajax_Handler {
         $transcript = sanitize_text_field( $_POST['transcript'] ?? '' );
         if ( empty( $transcript ) ) wp_send_json_error( [ 'message' => 'Transcript required.' ] );
         wp_send_json_success( VC_Voice_Commands::parse( $transcript ) );
+    }
+
+    public function handle_cart_summary(): void {
+        $this->verify_nonce();
+        if ( ! class_exists( 'WooCommerce' ) || ! WC()->cart ) {
+            wp_send_json_success([
+                'count'  => 0,
+                'total'  => '0đ',
+                'speech' => 'Giỏ hàng của bạn hiện đang trống.'
+            ]);
+            return;
+        }
+
+        $count = WC()->cart->get_cart_contents_count();
+        $total = strip_tags( WC()->cart->get_cart_total() );
+        $items = [];
+        foreach ( WC()->cart->get_cart() as $cart_item_key => $cart_item ) {
+            $_product = apply_filters( 'woocommerce_cart_item_product', $cart_item['data'], $cart_item, $cart_item_key );
+            if ( $_product && $_product->exists() && $cart_item['quantity'] > 0 ) {
+                $items[] = $cart_item['quantity'] . ' ' . $_product->get_name();
+            }
+        }
+
+        if ( $count > 0 ) {
+            $items_text = implode( ', ', array_slice( $items, 0, 3 ) );
+            $speech = "Giỏ hàng hiện có {$count} sản phẩm: {$items_text}, tổng tiền {$total}. Bạn có thể nói 'Thanh toán' để tiến hành đặt hàng.";
+        } else {
+            $speech = "Giỏ hàng của bạn hiện đang trống. Bạn có thể nói 'Cửa hàng' để chọn đặc sản nhé.";
+        }
+
+        wp_send_json_success([
+            'count'  => $count,
+            'total'  => $total,
+            'speech' => $speech
+        ]);
+    }
+
+    public function handle_get_current_products(): void {
+        $this->verify_nonce();
+        if ( ! class_exists( 'WooCommerce' ) ) {
+            wp_send_json_error( [ 'message' => 'WooCommerce not active.' ] );
+        }
+
+        $products = wc_get_products([
+            'limit'   => 6,
+            'status'  => 'publish',
+            'orderby' => 'date',
+            'order'   => 'DESC',
+        ]);
+
+        $list = [];
+        $speech_parts = [];
+        foreach ( $products as $p ) {
+            $price = strip_tags( wc_price( $p->get_price() ) );
+            $list[] = [
+                'id'    => $p->get_id(),
+                'name'  => $p->get_name(),
+                'price' => $price,
+                'url'   => get_permalink( $p->get_id() ),
+            ];
+            $speech_parts[] = $p->get_name() . ' giá ' . $price;
+        }
+
+        $speech = "Cửa hàng hiện có các món đặc sản nổi bật: " . implode( '; ', $speech_parts ) . ". Bạn muốn mua món nào, hãy nói 'Thêm vào giỏ' kèm tên món nhé.";
+
+        wp_send_json_success([
+            'products' => $list,
+            'speech'   => $speech,
+        ]);
     }
 }

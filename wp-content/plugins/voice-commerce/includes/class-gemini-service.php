@@ -48,6 +48,10 @@ Danh sách các action hợp lệ:
 - 'zoom_out': thu nhỏ cỡ chữ.
 - 'zoom_reset': cỡ chữ bình thường.
 - 'toggle_menu': mở hoặc xem danh mục menu lệnh.
+- 'accessibility_mode': bật hoặc tắt chế độ hỗ trợ người khiếm thị / khuyết tật (WCAG accessibility mode, đọc giọng nói khi di chuyển và tương phản cao).
+- 'read_products': đọc to danh sách các sản phẩm và giá tiền trên màn hình cho người khiếm thị nghe.
+- 'cart_summary': kiểm tra và đọc to số lượng món và tổng tiền giỏ hàng.
+- 'high_contrast': bật hoặc tắt chế độ tương phản cao (vàng đen cho người thị lực kém).
 - 'ai_chat': nếu người dùng hỏi thăm hoặc nhờ tư vấn về đặc sản Cần Thơ.
 
 Các sản phẩm có sẵn: {$available_products}.
