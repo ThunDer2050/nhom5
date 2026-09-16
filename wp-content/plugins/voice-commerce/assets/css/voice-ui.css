@@ -100,6 +100,39 @@
 .vc-mic-btn:active { transform: scale(0.95); }
 .vc-mic-icon { position: relative; z-index: 2; display: flex; }
 
+/* Hands-free Wake Word Badge */
+.vc-handsfree-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: #10b981;
+  color: #fff;
+  font-size: 8.5px;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 99px;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.8);
+  border: 1.5px solid #fff;
+  z-index: 10;
+  animation: vc-radar-pulse 1.8s infinite;
+  white-space: nowrap;
+}
+@keyframes vc-radar-pulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 8px rgba(16, 185, 129, 0.7); }
+  50% { transform: scale(1.1); box-shadow: 0 0 16px rgba(16, 185, 129, 1); }
+}
+
+.vc-icon-btn.vc-hf-active {
+  background: #10b981 !important;
+  color: #fff !important;
+  box-shadow: 0 0 14px rgba(16, 185, 129, 0.7);
+}
+.vc-chip-hf {
+  background: rgba(16, 185, 129, 0.15) !important;
+  border-color: rgba(16, 185, 129, 0.4) !important;
+  color: #34d399 !important;
+}
+
 /* Pulse Rings */
 .vc-pulse-ring {
   position: absolute;

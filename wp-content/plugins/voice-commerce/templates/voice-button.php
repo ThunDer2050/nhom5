@@ -20,6 +20,7 @@
             </span>
             <span class="vc-pulse-ring"></span>
             <span class="vc-pulse-ring vc-pulse-ring--2"></span>
+            <span id="vc-handsfree-badge" class="vc-handsfree-badge" style="display:none;" title="Đang lắng nghe: Nói 'Trợ lý ơi' để ra lệnh">&#127911; ON</span>
         </button>
     </div>
 
@@ -32,6 +33,9 @@
                 <span class="vc-badge-gemini">Gemini AI</span>
             </div>
             <div class="vc-header-actions">
+                <button id="vc-handsfree-toggle" class="vc-icon-btn" title="Bật/Tắt chế độ rảnh tay: Nói 'Trợ lý ơi' không cần bấm chuột" aria-label="Toggle Handsfree Wake Word">
+                    <span class="vc-hf-icon">&#127911;</span>
+                </button>
                 <button id="vc-tts-toggle" class="vc-icon-btn vc-tts-active" title="Bật/Tắt âm thanh giọng đọc" aria-label="Toggle Speech Audio">
                     <svg class="vc-sound-on" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
@@ -66,12 +70,12 @@
 
             <!-- Quick Action Chips -->
             <div class="vc-quick-chips">
+                <span class="vc-chip vc-chip-hf" data-cmd="che do ranh tay" title="Nói 'Trợ lý ơi' để gọi trợ lý">&#127911; Rảnh tay ("Trợ lý ơi")</span>
                 <span class="vc-chip" data-cmd="che do khiem thi">&#9855; Chế độ khiếm thị</span>
                 <span class="vc-chip" data-cmd="cua hang">&#128722; Cửa hàng</span>
                 <span class="vc-chip" data-cmd="kiem tra gio hang">&#128717;&#65039; Đọc giỏ hàng</span>
                 <span class="vc-chip" data-cmd="doc san pham">&#128266; Đọc sản phẩm</span>
                 <span class="vc-chip" data-cmd="doc noi dung">&#128196; Đọc bài viết</span>
-                <span class="vc-chip" data-cmd="che do toi">&#127769; Chế độ tối</span>
             </div>
         </div>
 

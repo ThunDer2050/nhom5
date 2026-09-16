@@ -11,8 +11,13 @@
     var ttsEnabled       = (localStorage.getItem('vc_tts_enabled') !== 'false');
     var a11yActive       = (localStorage.getItem('vc_a11y_mode') === 'true');
     var highContrast     = (localStorage.getItem('vc_high_contrast') === 'true');
+    var handsFreeActive  = (localStorage.getItem('vc_handsfree') === 'true');
     var currentZoom      = 100;
-    var a11yDebounce    = null;
+    var a11yDebounce     = null;
+    var wakeActiveWindow = false;
+    var wakeTimer        = null;
+
+    var WAKE_WORDS = ['tro ly oi', 'tro ly', 'hey can tho', 'alo can tho', 'xin chao tro ly', 'xin chao', 'ok shop', 'hey assistant'];
 
     // Elements
     var $wrapper          = $('#vc-wrapper');
@@ -21,6 +26,8 @@
     var $a11yMasterToggle = $('#vc-a11y-master-toggle');
     var $a11yStatusTag    = $('#vc-a11y-status-tag');
     var $srLive           = $('#vc-sr-live');
+    var $handsFreeToggle  = $('#vc-handsfree-toggle');
+    var $handsFreeBadge   = $('#vc-handsfree-badge');
     var $panel            = $('#vc-panel');
     var $status           = $('#vc-status');
     var $transcript       = $('#vc-transcript');
@@ -31,6 +38,41 @@
     var $ttsToggle        = $('#vc-tts-toggle');
     var $tabs             = $('.vc-tab-btn');
     var $tabPanes         = $('.vc-tab-content');
+
+    /* ── Audio Chime & Helpers ────────────────────────────── */
+    function playChime() {
+        try {
+            var AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (!AudioCtx) return;
+            var ctx = new AudioCtx();
+            var now = ctx.currentTime;
+            var osc = ctx.createOscillator();
+            var gain = ctx.createGain();
+
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(587.33, now);
+            osc.frequency.exponentialRampToValueAtTime(880, now + 0.12);
+
+            gain.gain.setValueAtTime(0.18, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+
+            osc.start(now);
+            osc.stop(now + 0.35);
+        } catch (e) {}
+    }
+
+    function removeAccentsJS(str) {
+        if (!str) return '';
+        return str.normalize('NFD')
+                  .replace(/[\u0300-\u036f]/g, '')
+                  .replace(/đ/g, 'd')
+                  .replace(/Đ/g, 'D')
+                  .toLowerCase()
+                  .trim();
+    }
 
     /* ── Helper Functions ─────────────────────────────────── */
     function esc(s) {
@@ -101,7 +143,7 @@
         }
     }
 
-    /* ── Speech Recognition ─────────────────────────────── */
+    /* ── Speech Recognition & Wake Word Detection ───────── */
     function buildRecognition() {
         var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (!SR) {
@@ -111,18 +153,22 @@
 
         var r = new SR();
         r.lang            = (VC.language === 'auto') ? 'vi-VN' : VC.language;
-        r.continuous      = false;
+        r.continuous      = handsFreeActive ? true : false;
         r.interimResults  = true;
         r.maxAlternatives = 2;
 
         r.onstart = function () {
             isListening = true;
             $micBtn.addClass('vc-listening');
-            setStatus(VC.i18n.listening, 'listening');
-            $transcript.text('');
-            $aiReply.hide().text('');
-            $result.html('');
-            openPanel('live');
+            if (handsFreeActive) {
+                setStatus('Đang lắng nghe: Nói "Trợ lý ơi" để ra lệnh...', 'listening');
+            } else {
+                setStatus(VC.i18n.listening, 'listening');
+                $transcript.text('');
+                $aiReply.hide().text('');
+                $result.html('');
+                openPanel('live');
+            }
         };
 
         r.onresult = function (e) {
@@ -131,27 +177,91 @@
                 if (e.results[i].isFinal) final   += e.results[i][0].transcript;
                 else                      interim += e.results[i][0].transcript;
             }
+
+            var spoken = (final || interim).trim();
+            var spokenClean = removeAccentsJS(spoken);
+
+            // 1. Hands-free Wake Word detection
+            if (handsFreeActive) {
+                var detectedWake = null;
+                for (var w = 0; w < WAKE_WORDS.length; w++) {
+                    var idx = spokenClean.indexOf(WAKE_WORDS[w]);
+                    if (idx !== -1) {
+                        detectedWake = {
+                            word: WAKE_WORDS[w],
+                            remainder: spokenClean.substring(idx + WAKE_WORDS[w].length).trim()
+                        };
+                        break;
+                    }
+                }
+
+                if (detectedWake) {
+                    playChime();
+                    openPanel('live');
+
+                    if (detectedWake.remainder.length > 2) {
+                        // Spoke wake word + command together: e.g. "Trợ lý ơi tìm bánh tét"
+                        setStatus('Đã nhận: ' + detectedWake.remainder, 'listening');
+                        $transcript.text(spoken);
+                        wakeActiveWindow = false;
+                        clearTimeout(wakeTimer);
+                        handleTranscript(detectedWake.remainder);
+                        return;
+                    } else {
+                        // Spoke wake word alone: e.g. "Trợ lý ơi"
+                        speakText('Dạ, em nghe đây ạ!');
+                        setStatus('Dạ em nghe! Bạn hãy nói câu lệnh...', 'listening');
+                        $transcript.text('🎤 ' + spoken);
+                        wakeActiveWindow = true;
+                        clearTimeout(wakeTimer);
+                        wakeTimer = setTimeout(function () {
+                            wakeActiveWindow = false;
+                            setStatus('Đang lắng nghe: Nói "Trợ lý ơi" để ra lệnh...', '');
+                        }, 8000);
+                        return;
+                    }
+                }
+
+                // If user called wake word earlier and is now speaking the command
+                if (wakeActiveWindow && final) {
+                    wakeActiveWindow = false;
+                    clearTimeout(wakeTimer);
+                    $transcript.text(final);
+                    handleTranscript(final.trim());
+                    return;
+                }
+            }
+
+            // 2. Normal mode
             $transcript.text(final || interim);
-            if (final) {
+            if (final && !handsFreeActive) {
                 stopListening();
                 handleTranscript(final.trim());
             }
         };
 
         r.onerror = function (e) {
-            isListening = false;
-            $micBtn.removeClass('vc-listening');
             if (e.error === 'not-allowed') {
                 showToast(VC.i18n.micDenied, 'error');
-            } else if (e.error !== 'aborted') {
-                setStatus('Lỗi: ' + e.error, '');
+                handsFreeActive = false;
+                updateHandsFreeUI();
+            } else if (e.error !== 'aborted' && e.error !== 'no-speech') {
+                console.warn('Speech recognition error:', e.error);
             }
         };
 
         r.onend = function () {
             isListening = false;
             $micBtn.removeClass('vc-listening');
-            if (!$transcript.text()) {
+
+            // In Hands-free mode, auto restart listening seamlessly
+            if (handsFreeActive) {
+                setTimeout(function () {
+                    if (handsFreeActive) {
+                        try { startListening(); } catch (err) {}
+                    }
+                }, 350);
+            } else if (!$transcript.text()) {
                 setStatus('Nhấn micro hoặc Alt+M để nói lệnh...', '');
             }
         };
@@ -160,6 +270,10 @@
     }
 
     function startListening() {
+        if (recognition) {
+            try { recognition.stop(); } catch (e) {}
+            recognition = null;
+        }
         recognition = buildRecognition();
         if (!recognition) return;
         try { recognition.start(); } catch (e) {}
@@ -387,6 +501,10 @@
                 toggleAccessibility();
                 break;
 
+            case 'hands_free_mode':
+                toggleHandsFree();
+                break;
+
             case 'cart_summary':
                 readCartSummary();
                 break;
@@ -583,6 +701,46 @@
         }
     }
 
+    /* ── Hands-Free Wake Word Mode ("Trợ lý ơi") ─────────── */
+    function toggleHandsFree(force) {
+        if (typeof force === 'boolean') {
+            handsFreeActive = force;
+        } else {
+            handsFreeActive = !handsFreeActive;
+        }
+        localStorage.setItem('vc_handsfree', handsFreeActive ? 'true' : 'false');
+        updateHandsFreeUI();
+
+        if (handsFreeActive) {
+            playChime();
+            startListening();
+            var msg = 'Chế độ rảnh tay đã bật. Bạn có thể nói "Trợ lý ơi" bất cứ lúc nào để ra lệnh.';
+            setStatus('Đang lắng nghe: Nói "Trợ lý ơi" để ra lệnh...', 'listening');
+            showToast('Rảnh tay: Đang lắng nghe "Trợ lý ơi"', 'success');
+            speakText(msg);
+            announceScreenReader(msg);
+        } else {
+            wakeActiveWindow = false;
+            clearTimeout(wakeTimer);
+            stopListening();
+            var msg = 'Đã tắt chế độ rảnh tay.';
+            setStatus('Nhấn micro hoặc Alt+M để nói lệnh...', '');
+            showToast('Đã tắt chế độ rảnh tay', 'info');
+            speakText(msg);
+            announceScreenReader(msg);
+        }
+    }
+
+    function updateHandsFreeUI() {
+        if (handsFreeActive) {
+            $handsFreeToggle.addClass('vc-hf-active').attr('title', 'Chế độ rảnh tay: ĐANG BẬT (Nói "Trợ lý ơi")');
+            $handsFreeBadge.show();
+        } else {
+            $handsFreeToggle.removeClass('vc-hf-active').attr('title', 'Bật chế độ rảnh tay: Nói "Trợ lý ơi" không cần bấm mic');
+            $handsFreeBadge.hide();
+        }
+    }
+
     function toggleHighContrast(force) {
         if (typeof force === 'boolean') {
             highContrast = force;
@@ -731,6 +889,19 @@
     });
     updateTTSButton();
 
+    // Hands-free Wake Word Toggle
+    $handsFreeToggle.on('click', function () {
+        toggleHandsFree();
+    });
+    updateHandsFreeUI();
+
+    // Auto-start hands-free listening if saved as active
+    if (handsFreeActive) {
+        setTimeout(function () {
+            try { startListening(); } catch (e) {}
+        }, 800);
+    }
+
     // Direct clicks on Menu items
     $(document).on('click', '.vc-menu-item', function () {
         var action = $(this).data('action');
@@ -756,6 +927,11 @@
         if (e.altKey && (e.key === 'm' || e.key === 'M' || e.keyCode === 77)) {
             e.preventDefault();
             toggleListening();
+        }
+        // Alt + H: Toggle Hands-free Wake Word Mode
+        else if (e.altKey && (e.key === 'h' || e.key === 'H' || e.keyCode === 72)) {
+            e.preventDefault();
+            toggleHandsFree();
         }
         // Alt + A: Toggle Accessibility Mode
         else if (e.altKey && (e.key === 'a' || e.key === 'A' || e.keyCode === 65)) {
@@ -786,6 +962,6 @@
         }
     });
 
-    console.info('[Voice Commerce AI v1.2] Loaded with WCAG 2.1 Accessibility Mode.');
+    console.info('[Voice Commerce AI v1.2] Loaded with Wake Word & WCAG 2.1 Accessibility Mode.');
 
 }(jQuery));

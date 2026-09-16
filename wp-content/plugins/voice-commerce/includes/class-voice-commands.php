@@ -28,6 +28,7 @@ class VC_Voice_Commands {
         'zoom_out'       => [ ['thu nho chu','chu nho hon','giam co chu','thu nho'], ['zoom out','smaller text','decrease font'] ],
         'zoom_reset'     => [ ['co chu chuan','chu binh thuong','khoi phuc co chu'], ['reset zoom','normal text','reset font'] ],
         'accessibility_mode' => [ ['che do khiem thi','khiem thi','ho tro khiem thi','tro nang','che do nguoi mu','tat che do khiem thi','bat che do khiem thi','che do tiep can'], ['accessibility mode','blind mode','accessibility','assistive mode'] ],
+        'hands_free_mode'    => [ ['che do ranh tay','ranh tay','bat ranh tay','tat ranh tay','tu khoa danh thuc','tro ly oi'], ['hands free','hands free mode','wake word','voice activation'] ],
         'read_products'      => [ ['doc san pham','danh sach san pham','doc cac san pham','doc hang hoa','co nhung san pham nao'], ['read products','list products','speak products'] ],
         'cart_summary'       => [ ['kiem tra gio hang','doc gio hang','co bao nhieu mon','tong tien gio hang','kiem tra gio'], ['cart summary','check cart','how many items'] ],
         'high_contrast'      => [ ['tuong phan cao','che do tuong phan','do tuong phan cao','mau tuong phan'], ['high contrast','contrast mode','toggle contrast'] ],
