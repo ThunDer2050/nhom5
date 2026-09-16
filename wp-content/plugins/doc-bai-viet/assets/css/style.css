@@ -1,6 +1,6 @@
 /**
  * ============================================================
- * CSS CHO PLUGIN ĐỌC BÀI VIẾT
+ * CSS CHO PLUGIN ĐỌC BÀI VIẾT (v3.0)
  * ============================================================
  * File này định nghĩa giao diện cho khu vực điều khiển
  * đọc bài viết. Sử dụng prefix 'dbv-' cho tất cả class
@@ -37,6 +37,52 @@
     font-weight: 600;
     color: #1d2327;
     vertical-align: middle;
+}
+
+/* --- Khu vực chọn ngôn ngữ --- */
+.dbv-lang-select {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+    font-size: 14px;
+    color: #50575e;
+}
+
+.dbv-lang-select label {
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+/* --- Dropdown chọn ngôn ngữ --- */
+.dbv-select {
+    padding: 6px 32px 6px 12px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #1d2327;
+    background-color: #ffffff;
+    border: 1px solid #8c8f94;
+    border-radius: 4px;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2350575e' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 12px;
+    min-width: 160px;
+}
+
+.dbv-select:hover {
+    border-color: #0073aa;
+}
+
+.dbv-select:focus {
+    border-color: #0073aa;
+    box-shadow: 0 0 0 1px #0073aa;
 }
 
 /* --- Khu vực các nút điều khiển --- */
@@ -173,5 +219,14 @@
 
     #dbv-speed-range {
         width: 100px;
+    }
+
+    .dbv-lang-select {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .dbv-select {
+        width: 100%;
     }
 }

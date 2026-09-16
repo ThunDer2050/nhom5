@@ -1,19 +1,24 @@
 /**
  * ============================================================
- * JAVASCRIPT CHO PLUGIN ĐỌC BÀI VIẾT (v2.1)
+ * JAVASCRIPT CHO PLUGIN ĐỌC BÀI VIẾT (v3.0)
  * ============================================================
  *
- * Plugin hỗ trợ 2 chế độ đọc:
+ * Plugin hỗ trợ 2 chế độ đọc và 12 ngôn ngữ:
  *
  * CHẾ ĐỘ 1: Web Speech API (SpeechSynthesis)
  *   - Sử dụng giọng đọc có sẵn trên trình duyệt.
- *   - Ưu tiên nếu trình duyệt có voice tiếng Việt.
+ *   - Ưu tiên nếu trình duyệt có voice của ngôn ngữ đã chọn.
  *
  * CHẾ ĐỘ 2: Google Translate TTS (MIỄN PHÍ)
- *   - Sử dụng khi trình duyệt KHÔNG có voice tiếng Việt.
+ *   - Sử dụng khi trình duyệt KHÔNG có voice của ngôn ngữ đã chọn.
  *   - Không cần API Key.
  *   - JS gửi AJAX request tới WordPress → PHP gọi Google Translate TTS
  *     → trả về audio MP3 → JS phát bằng HTML5 Audio.
+ *
+ * NGÔN NGỮ HỖ TRỢ:
+ *   vi (Tiếng Việt), en (English), fr (Français), de (Deutsch),
+ *   ja (日本語), ko (한국어), zh (中文), es (Español),
+ *   pt (Português), it (Italiano), ru (Русский), th (ไทย)
  */
 
 (function () {
@@ -35,9 +40,10 @@
     var synth = window.speechSynthesis || null;
 
     // Dữ liệu từ PHP (wp_localize_script).
-    var noiDung = dbvData.noiDung;
-    var ajaxUrl = dbvData.ajaxUrl;
-    var nonce   = dbvData.nonce;
+    var noiDung     = dbvData.noiDung;
+    var ajaxUrl     = dbvData.ajaxUrl;
+    var nonce       = dbvData.nonce;
+    var defaultLang = dbvData.defaultLang || 'vi';
 
     // Trạng thái.
     var cheDoDoc     = '';        // 'speech' hoặc 'gtts'.
@@ -46,9 +52,30 @@
     var dangDoc      = false;
     var dangTamDung  = false;
     var tocDoDoc     = 1.0;
-    var voiceViet    = null;     // Voice tiếng Việt (Web Speech API).
+    var ngonNguChon  = defaultLang; // Ngôn ngữ hiện tại được chọn.
+    var voiceChon    = null;     // Voice của ngôn ngữ đã chọn (Web Speech API).
     var audioHienTai = null;     // Audio element (Google Translate TTS).
     var xhrHienTai   = null;     // XMLHttpRequest hiện tại.
+
+    /**
+     * Bảng ánh xạ mã ngôn ngữ → mã BCP-47 cho Web Speech API.
+     * Web Speech API sử dụng mã BCP-47 (ví dụ: vi-VN, en-US).
+     * Bảng này giúp tìm voice phù hợp khi người dùng chọn ngôn ngữ.
+     */
+    var langMap = {
+        'vi': ['vi-VN', 'vi'],
+        'en': ['en-US', 'en-GB', 'en-AU', 'en-IN', 'en'],
+        'fr': ['fr-FR', 'fr-CA', 'fr'],
+        'de': ['de-DE', 'de-AT', 'de'],
+        'ja': ['ja-JP', 'ja'],
+        'ko': ['ko-KR', 'ko'],
+        'zh': ['zh-CN', 'zh-TW', 'zh-HK', 'zh'],
+        'es': ['es-ES', 'es-MX', 'es-US', 'es'],
+        'pt': ['pt-BR', 'pt-PT', 'pt'],
+        'it': ['it-IT', 'it'],
+        'ru': ['ru-RU', 'ru'],
+        'th': ['th-TH', 'th']
+    };
 
     // Lấy các phần tử HTML.
     var btnDoc      = document.getElementById('dbv-btn-doc');
@@ -59,6 +86,7 @@
     var speedValue  = document.getElementById('dbv-speed-value');
     var statusText  = document.getElementById('dbv-status-text');
     var thongBaoDiv = document.getElementById('dbv-thong-bao');
+    var langSelect  = document.getElementById('dbv-lang');
 
     if (!btnDoc) {
         return;
@@ -121,10 +149,17 @@
     }
 
     // ============================================================
-    // PHẦN 4: TÌM VOICE TIẾNG VIỆT (Web Speech API)
+    // PHẦN 4: TÌM VOICE THEO NGÔN NGỮ (Web Speech API)
     // ============================================================
 
-    function timVoiceViet() {
+    /**
+     * timVoiceTheoNgonNgu():
+     * Tìm voice phù hợp với mã ngôn ngữ đã chọn.
+     *
+     * @param {string} langCode - Mã ngôn ngữ (ví dụ: 'vi', 'en', 'fr').
+     * @return {boolean} - true nếu tìm thấy voice.
+     */
+    function timVoiceTheoNgonNgu(langCode) {
         if (!synth) {
             return false;
         }
@@ -134,23 +169,43 @@
             return false;
         }
 
-        for (var i = 0; i < voices.length; i++) {
-            if (voices[i].lang && voices[i].lang.toLowerCase().indexOf('vi') === 0) {
-                voiceViet = voices[i];
+        // Lấy danh sách mã BCP-47 cho ngôn ngữ này.
+        var maBCP47 = langMap[langCode] || [langCode];
+
+        // Duyệt qua danh sách mã BCP-47, ưu tiên theo thứ tự.
+        for (var m = 0; m < maBCP47.length; m++) {
+            var maTimKiem = maBCP47[m].toLowerCase();
+
+            for (var i = 0; i < voices.length; i++) {
+                if (voices[i].lang) {
+                    var voiceLang = voices[i].lang.toLowerCase();
+                    // So khớp chính xác hoặc bắt đầu bằng mã ngôn ngữ.
+                    if (voiceLang === maTimKiem || voiceLang.indexOf(maTimKiem + '-') === 0) {
+                        voiceChon = voices[i];
+                        return true;
+                    }
+                }
+            }
+        }
+
+        // Fallback: tìm voice có lang bắt đầu bằng mã ngôn ngữ chính.
+        var maChinhLower = langCode.toLowerCase();
+        for (var k = 0; k < voices.length; k++) {
+            if (voices[k].lang && voices[k].lang.toLowerCase().indexOf(maChinhLower) === 0) {
+                voiceChon = voices[k];
                 return true;
             }
         }
 
+        voiceChon = null;
         return false;
     }
 
-    // Thử tìm voice ngay lập tức.
-    var daTim = timVoiceViet();
-
-    // Chrome tải voices bất đồng bộ.
-    if (!daTim && synth && synth.onvoiceschanged !== undefined) {
+    // Chrome tải voices bất đồng bộ, đăng ký sự kiện để cập nhật.
+    if (synth && synth.onvoiceschanged !== undefined) {
         synth.onvoiceschanged = function () {
-            timVoiceViet();
+            // Voices đã sẵn sàng, không cần làm gì ở đây.
+            // Sẽ tìm voice khi nhấn nút Đọc.
         };
     }
 
@@ -167,10 +222,13 @@
 
         var utterance = new SpeechSynthesisUtterance(cacDoan[doanHienTai]);
 
-        if (voiceViet) {
-            utterance.voice = voiceViet;
+        // Gán voice và ngôn ngữ đã chọn.
+        if (voiceChon) {
+            utterance.voice = voiceChon;
         }
-        utterance.lang = 'vi-VN';
+        // Sử dụng mã BCP-47 đầu tiên của ngôn ngữ đã chọn.
+        var maBCP47 = langMap[ngonNguChon] || [ngonNguChon];
+        utterance.lang = maBCP47[0];
         utterance.rate = tocDoDoc;
 
         utterance.onend = function () {
@@ -200,7 +258,7 @@
      *
      * Luồng:
      * 1. Gửi AJAX POST tới admin-ajax.php (action = dbv_text_to_speech).
-     * 2. PHP gọi Google Translate TTS endpoint, nhận audio MP3.
+     * 2. PHP gọi Google Translate TTS endpoint với mã ngôn ngữ, nhận audio MP3.
      * 3. PHP encode audio thành base64, trả về cho JS.
      * 4. JS tạo Audio element từ base64 data URI và phát.
      * 5. Khi audio kết thúc (onended), đọc đoạn tiếp theo.
@@ -257,9 +315,11 @@
             dungDoc();
         };
 
+        // Gửi kèm mã ngôn ngữ (lang) cho PHP proxy.
         var params = 'action=dbv_text_to_speech'
             + '&nonce=' + encodeURIComponent(nonce)
-            + '&text=' + encodeURIComponent(cacDoan[doanHienTai]);
+            + '&text=' + encodeURIComponent(cacDoan[doanHienTai])
+            + '&lang=' + encodeURIComponent(ngonNguChon);
         xhr.send(params);
     }
 
@@ -302,21 +362,24 @@
      * Xác định chế độ đọc và bắt đầu từ đầu.
      *
      * Ưu tiên:
-     * 1. Web Speech API (nếu có voice tiếng Việt trên trình duyệt).
+     * 1. Web Speech API (nếu có voice của ngôn ngữ đã chọn trên trình duyệt).
      * 2. Google Translate TTS (miễn phí, luôn khả dụng khi có mạng).
      */
     function batDauDoc() {
-        // Thử tìm voice tiếng Việt lần nữa.
-        if (!voiceViet) {
-            timVoiceViet();
+        // Lấy ngôn ngữ đã chọn từ dropdown.
+        if (langSelect) {
+            ngonNguChon = langSelect.value;
         }
+
+        // Tìm voice cho ngôn ngữ đã chọn.
+        var coVoice = timVoiceTheoNgonNgu(ngonNguChon);
 
         // Dừng mọi thứ đang chạy.
         dungDocNgay();
         anThongBao();
 
         // Xác định chế độ đọc.
-        if (voiceViet) {
+        if (coVoice) {
             // Chế độ 1: Web Speech API.
             cheDoDoc = 'speech';
             cacDoan = chiaDoan(noiDung, 200);
@@ -336,8 +399,12 @@
         dangDoc = true;
         dangTamDung = false;
 
+        // Lấy tên ngôn ngữ để hiển thị trạng thái.
+        var tenNgonNgu = langSelect ? langSelect.options[langSelect.selectedIndex].text : ngonNguChon;
+        var cheDoHienThi = (cheDoDoc === 'speech') ? 'Web Speech API' : 'Google Translate TTS';
+
         capNhatNut('dang-doc');
-        capNhatTrangThai('Đang đọc...');
+        capNhatTrangThai('Đang đọc [' + tenNgonNgu + ' — ' + cheDoHienThi + ']...');
 
         if (cheDoDoc === 'speech') {
             docDoanSpeech();
@@ -502,6 +569,19 @@
             // Cập nhật tốc độ cho audio đang phát (Google Translate TTS mode).
             if (cheDoDoc === 'gtts' && audioHienTai) {
                 audioHienTai.playbackRate = tocDoDoc;
+            }
+        });
+    }
+
+    /**
+     * Khi người dùng đổi ngôn ngữ trong lúc đang đọc:
+     * Dừng đọc hiện tại để tránh nhầm lẫn ngôn ngữ.
+     */
+    if (langSelect) {
+        langSelect.addEventListener('change', function () {
+            if (dangDoc) {
+                dungDoc();
+                capNhatTrangThai('Đã đổi ngôn ngữ. Nhấn "Đọc" để bắt đầu lại.');
             }
         });
     }

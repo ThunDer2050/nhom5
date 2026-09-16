@@ -2,8 +2,8 @@
 /**
  * Plugin Name: Đọc Bài Viết
  * Plugin URI:  https://github.com/ThunDer2050/nhom5
- * Description: Đọc nội dung bài viết bằng giọng tiếng Việt. Hỗ trợ Web Speech API và Google Translate TTS (miễn phí).
- * Version:     2.1.0
+ * Description: Đọc nội dung bài viết bằng giọng nói. Hỗ trợ 12 ngôn ngữ: Tiếng Việt, Anh, Pháp, Đức, Nhật, Hàn, Trung, Tây Ban Nha, Bồ Đào Nha, Ý, Nga, Thái. Sử dụng Web Speech API và Google Translate TTS (miễn phí).
+ * Version:     3.0.0
  * Author:      Nhóm 5
  * Author URI:  https://github.com/ThunDer2050
  * License:     GPL-2.0+
@@ -23,7 +23,28 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 define( 'DBV_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'DBV_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
-define( 'DBV_VERSION', '2.1.0' );
+define( 'DBV_VERSION', '3.0.0' );
+
+/**
+ * Danh sách ngôn ngữ được hỗ trợ.
+ * Mảng: mã ngôn ngữ => tên hiển thị.
+ */
+function dbv_get_supported_languages() {
+    return array(
+        'vi' => 'Tiếng Việt',
+        'en' => 'English',
+        'fr' => 'Français',
+        'de' => 'Deutsch',
+        'ja' => '日本語',
+        'ko' => '한국어',
+        'zh' => '中文',
+        'es' => 'Español',
+        'pt' => 'Português',
+        'it' => 'Italiano',
+        'ru' => 'Русский',
+        'th' => 'ไทย',
+    );
+}
 
 /**
  * ============================================================
@@ -36,6 +57,8 @@ define( 'DBV_VERSION', '2.1.0' );
  * - noiDung: nội dung bài viết (text thuần, đã strip HTML).
  * - ajaxUrl: URL của admin-ajax.php để gửi AJAX request.
  * - nonce: mã bảo mật cho AJAX request.
+ * - languages: danh sách ngôn ngữ hỗ trợ.
+ * - defaultLang: ngôn ngữ mặc định (vi).
  */
 function dbv_enqueue_assets() {
     if ( ! is_singular( 'post' ) ) {
@@ -86,11 +109,15 @@ function dbv_enqueue_assets() {
      * - noiDung: nội dung bài viết (text thuần).
      * - ajaxUrl: URL AJAX endpoint của WordPress.
      * - nonce: mã bảo mật AJAX.
+     * - languages: danh sách ngôn ngữ hỗ trợ { code: name }.
+     * - defaultLang: ngôn ngữ mặc định.
      */
     wp_localize_script( 'dbv-script', 'dbvData', array(
-        'noiDung' => $van_ban_doc,
-        'ajaxUrl' => admin_url( 'admin-ajax.php' ),
-        'nonce'   => wp_create_nonce( 'dbv_tts_nonce' ),
+        'noiDung'     => $van_ban_doc,
+        'ajaxUrl'     => admin_url( 'admin-ajax.php' ),
+        'nonce'       => wp_create_nonce( 'dbv_tts_nonce' ),
+        'languages'   => dbv_get_supported_languages(),
+        'defaultLang' => 'vi',
     ) );
 }
 add_action( 'wp_enqueue_scripts', 'dbv_enqueue_assets' );
@@ -143,13 +170,14 @@ add_action( 'admin_menu', 'dbv_admin_menu' );
  * Không cần API Key vì sử dụng Google Translate TTS miễn phí.
  */
 function dbv_settings_page() {
+    $languages = dbv_get_supported_languages();
     ?>
     <div class="wrap">
         <!-- Tiêu đề trang -->
         <div class="dbv-admin-header">
             <h1>🔊 <?php echo esc_html__( 'Đọc Bài Viết - Cài đặt', 'doc-bai-viet' ); ?></h1>
             <p class="dbv-admin-desc">
-                <?php echo esc_html__( 'Plugin đọc nội dung bài viết bằng giọng tiếng Việt — Hoàn toàn miễn phí.', 'doc-bai-viet' ); ?>
+                <?php echo esc_html__( 'Plugin đọc nội dung bài viết bằng giọng nói — Hỗ trợ 12 ngôn ngữ — Hoàn toàn miễn phí.', 'doc-bai-viet' ); ?>
             </p>
         </div>
 
@@ -164,24 +192,44 @@ function dbv_settings_page() {
             </p>
         </div>
 
+        <!-- Card: Ngôn ngữ hỗ trợ -->
+        <div class="dbv-admin-card">
+            <h2>🌐 <?php echo esc_html__( 'Ngôn ngữ hỗ trợ', 'doc-bai-viet' ); ?></h2>
+            <p class="dbv-card-desc">
+                <?php echo esc_html__( 'Plugin hỗ trợ đọc bài viết bằng 12 ngôn ngữ khác nhau. Người dùng có thể chọn ngôn ngữ trực tiếp trên giao diện đọc bài viết.', 'doc-bai-viet' ); ?>
+            </p>
+            <div class="dbv-lang-grid">
+                <?php foreach ( $languages as $code => $name ) : ?>
+                    <div class="dbv-lang-item">
+                        <span class="dbv-lang-code"><?php echo esc_html( $code ); ?></span>
+                        <span class="dbv-lang-name"><?php echo esc_html( $name ); ?></span>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+
         <!-- Card: Cách hoạt động -->
         <div class="dbv-admin-card">
             <h2>ℹ️ <?php echo esc_html__( 'Cách hoạt động', 'doc-bai-viet' ); ?></h2>
             <div class="dbv-flow">
                 <div class="dbv-flow-step">
                     <span class="dbv-flow-number">1</span>
-                    <p><?php echo esc_html__( 'Plugin kiểm tra trình duyệt có giọng đọc tiếng Việt sẵn có không (Web Speech API).', 'doc-bai-viet' ); ?></p>
+                    <p><?php echo esc_html__( 'Người dùng chọn ngôn ngữ từ menu thả xuống trên khu vực đọc bài viết.', 'doc-bai-viet' ); ?></p>
                 </div>
                 <div class="dbv-flow-step">
                     <span class="dbv-flow-number">2</span>
-                    <p><?php echo esc_html__( 'Nếu CÓ → sử dụng giọng đọc trình duyệt (nhanh, không cần mạng).', 'doc-bai-viet' ); ?></p>
+                    <p><?php echo esc_html__( 'Plugin kiểm tra trình duyệt có giọng đọc của ngôn ngữ đó không (Web Speech API).', 'doc-bai-viet' ); ?></p>
                 </div>
                 <div class="dbv-flow-step">
                     <span class="dbv-flow-number">3</span>
-                    <p><?php echo esc_html__( 'Nếu KHÔNG → sử dụng Google Translate TTS (miễn phí, cần kết nối mạng).', 'doc-bai-viet' ); ?></p>
+                    <p><?php echo esc_html__( 'Nếu CÓ → sử dụng giọng đọc trình duyệt (nhanh, không cần mạng).', 'doc-bai-viet' ); ?></p>
                 </div>
                 <div class="dbv-flow-step">
                     <span class="dbv-flow-number">4</span>
+                    <p><?php echo esc_html__( 'Nếu KHÔNG → sử dụng Google Translate TTS (miễn phí, cần kết nối mạng).', 'doc-bai-viet' ); ?></p>
+                </div>
+                <div class="dbv-flow-step">
+                    <span class="dbv-flow-number">5</span>
                     <p><?php echo esc_html__( 'Nội dung được chia thành các đoạn nhỏ, gửi qua server WordPress để lấy audio MP3 từ Google, rồi phát lần lượt.', 'doc-bai-viet' ); ?></p>
                 </div>
             </div>
@@ -194,7 +242,8 @@ function dbv_settings_page() {
                 <li><?php echo esc_html__( 'Tạo hoặc mở một bài viết (Post) trên website.', 'doc-bai-viet' ); ?></li>
                 <li><?php echo esc_html__( 'Truy cập bài viết ở frontend (trang xem bài viết).', 'doc-bai-viet' ); ?></li>
                 <li><?php echo esc_html__( 'Khu vực "Đọc Bài Viết" sẽ tự động xuất hiện ở cuối nội dung.', 'doc-bai-viet' ); ?></li>
-                <li><?php echo esc_html__( 'Nhấn nút "Đọc" để bắt đầu nghe bài viết bằng tiếng Việt.', 'doc-bai-viet' ); ?></li>
+                <li><?php echo esc_html__( 'Chọn ngôn ngữ phù hợp với nội dung bài viết từ menu thả xuống.', 'doc-bai-viet' ); ?></li>
+                <li><?php echo esc_html__( 'Nhấn nút "Đọc" để bắt đầu nghe bài viết.', 'doc-bai-viet' ); ?></li>
                 <li><?php echo esc_html__( 'Sử dụng các nút Tạm dừng, Tiếp tục, Dừng để điều khiển.', 'doc-bai-viet' ); ?></li>
             </ol>
 
@@ -222,8 +271,8 @@ function dbv_settings_page() {
                         <td><?php echo esc_html__( 'Google Translate TTS (miễn phí)', 'doc-bai-viet' ); ?></td>
                     </tr>
                     <tr>
-                        <td><strong><?php echo esc_html__( 'Ngôn ngữ đọc', 'doc-bai-viet' ); ?></strong></td>
-                        <td><?php echo esc_html__( 'Tiếng Việt (vi)', 'doc-bai-viet' ); ?></td>
+                        <td><strong><?php echo esc_html__( 'Ngôn ngữ hỗ trợ', 'doc-bai-viet' ); ?></strong></td>
+                        <td><?php echo esc_html__( '12 ngôn ngữ (vi, en, fr, de, ja, ko, zh, es, pt, it, ru, th)', 'doc-bai-viet' ); ?></td>
                     </tr>
                     <tr>
                         <td><strong><?php echo esc_html__( 'Yêu cầu API Key', 'doc-bai-viet' ); ?></strong></td>
@@ -247,7 +296,7 @@ function dbv_settings_page() {
  * Xử lý AJAX request từ JavaScript frontend.
  *
  * Luồng hoạt động:
- * 1. JS gửi AJAX POST với text cần đọc.
+ * 1. JS gửi AJAX POST với text cần đọc và mã ngôn ngữ (lang).
  * 2. PHP gọi Google Translate TTS endpoint (miễn phí, không cần API Key).
  * 3. Google trả về file audio MP3.
  * 4. PHP chuyển audio (base64) về cho JS phát.
@@ -262,7 +311,7 @@ function dbv_settings_page() {
  * Params:
  *   - ie=UTF-8 (encoding)
  *   - q=TEXT (nội dung cần đọc, URL encoded)
- *   - tl=vi (ngôn ngữ: tiếng Việt)
+ *   - tl=LANG (mã ngôn ngữ, ví dụ: vi, en, fr, de, ...)
  *   - client=tw-ob (client identifier)
  *   - idx=0 (chỉ số đoạn)
  *   - total=1 (tổng số đoạn)
@@ -284,7 +333,7 @@ function dbv_ajax_text_to_speech() {
     // Bước 2: Lấy text cần đọc từ request.
     $text = isset( $_POST['text'] ) ? wp_unslash( $_POST['text'] ) : '';
 
-    // Chỉ loại bỏ thẻ HTML, giữ nguyên nội dung tiếng Việt.
+    // Chỉ loại bỏ thẻ HTML, giữ nguyên nội dung.
     $text = wp_strip_all_tags( $text );
     $text = trim( $text );
 
@@ -299,20 +348,29 @@ function dbv_ajax_text_to_speech() {
         $text = mb_substr( $text, 0, 200, 'UTF-8' );
     }
 
-    // Bước 3: Tạo URL gọi Google Translate TTS.
+    // Bước 3: Lấy mã ngôn ngữ từ request.
+    $lang = isset( $_POST['lang'] ) ? sanitize_text_field( wp_unslash( $_POST['lang'] ) ) : 'vi';
+
+    // Kiểm tra ngôn ngữ có hợp lệ không.
+    $supported = dbv_get_supported_languages();
+    if ( ! array_key_exists( $lang, $supported ) ) {
+        $lang = 'vi'; // Mặc định về tiếng Việt nếu không hợp lệ.
+    }
+
+    // Bước 4: Tạo URL gọi Google Translate TTS.
     $text_encoded = rawurlencode( $text );
     $text_len     = mb_strlen( $text, 'UTF-8' );
 
     $tts_url = 'https://translate.google.com/translate_tts?'
         . 'ie=UTF-8'
         . '&q=' . $text_encoded
-        . '&tl=vi'
+        . '&tl=' . $lang
         . '&client=tw-ob'
         . '&idx=0'
         . '&total=1'
         . '&textlen=' . $text_len;
 
-    // Bước 4: Gọi Google Translate TTS bằng wp_remote_get().
+    // Bước 5: Gọi Google Translate TTS bằng wp_remote_get().
     $response = wp_remote_get( $tts_url, array(
         'timeout'    => 15,
         'user-agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -321,7 +379,7 @@ function dbv_ajax_text_to_speech() {
         ),
     ) );
 
-    // Bước 5: Kiểm tra lỗi kết nối.
+    // Bước 6: Kiểm tra lỗi kết nối.
     if ( is_wp_error( $response ) ) {
         wp_send_json_error( array(
             'message' => 'Lỗi kết nối: ' . $response->get_error_message(),
@@ -331,14 +389,14 @@ function dbv_ajax_text_to_speech() {
     $response_code = wp_remote_retrieve_response_code( $response );
     $audio_data    = wp_remote_retrieve_body( $response );
 
-    // Bước 6: Kiểm tra response.
+    // Bước 7: Kiểm tra response.
     if ( 200 !== $response_code || empty( $audio_data ) ) {
         wp_send_json_error( array(
             'message' => 'Không thể tải audio từ Google (HTTP ' . $response_code . '). Vui lòng thử lại.',
         ) );
     }
 
-    // Bước 7: Trả về audio dạng base64 cho JavaScript.
+    // Bước 8: Trả về audio dạng base64 cho JavaScript.
     $audio_base64 = base64_encode( $audio_data );
     wp_send_json_success( array(
         'audio' => $audio_base64,
@@ -354,12 +412,25 @@ add_action( 'wp_ajax_nopriv_dbv_text_to_speech', 'dbv_ajax_text_to_speech' );
  * ============================================================
  */
 function dbv_render_player() {
+    $languages = dbv_get_supported_languages();
+
     $html = '<div id="dbv-player" class="dbv-player">';
 
     // Tiêu đề.
     $html .= '<div class="dbv-header">';
     $html .= '<span class="dbv-icon">&#128264;</span> ';
     $html .= '<span class="dbv-title">' . esc_html__( 'Đọc Bài Viết', 'doc-bai-viet' ) . '</span>';
+    $html .= '</div>';
+
+    // Chọn ngôn ngữ.
+    $html .= '<div class="dbv-lang-select">';
+    $html .= '<label for="dbv-lang">' . esc_html__( 'Ngôn ngữ:', 'doc-bai-viet' ) . ' </label>';
+    $html .= '<select id="dbv-lang" class="dbv-select">';
+    foreach ( $languages as $code => $name ) {
+        $selected = ( 'vi' === $code ) ? ' selected' : '';
+        $html .= '<option value="' . esc_attr( $code ) . '"' . $selected . '>' . esc_html( $name ) . '</option>';
+    }
+    $html .= '</select>';
     $html .= '</div>';
 
     // Các nút điều khiển.
