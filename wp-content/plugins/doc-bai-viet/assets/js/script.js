@@ -25,11 +25,20 @@
     'use strict';
 
     // ============================================================
-    // PHẦN 1: KIỂM TRA ĐIỀU KIỆN
+    // PHẦN 1: KHỞI ĐỘNG SAU KHI DOM SẴN SÀNG
+    // ============================================================
+    function init() {
+
+    // ============================================================
+    // PHẦN 2: KIỂM TRA ĐIỀU KIỆN
     // ============================================================
 
     if (typeof dbvData === 'undefined' || !dbvData.noiDung) {
-        hienThongBao('Bài viết không có nội dung để đọc.');
+        var tbDiv = document.getElementById('dbv-thong-bao');
+        if (tbDiv) {
+            tbDiv.textContent = 'Bài viết không có nội dung để đọc.';
+            tbDiv.style.display = 'block';
+        }
         return;
     }
 
@@ -107,8 +116,12 @@
         var GH = gioiHan || 180;
         var ketQua = [];
 
-        // Tách theo dấu câu và xuống dòng.
-        var cacCau = vanBan.split(/(?<=[.?!;])\s+|\n+/);
+        // Tách theo dấu câu — KHÔNG dùng lookbehind (tương thích mọi trình duyệt).
+        // Chèn marker \x00 sau dấu câu, rồi split theo marker + khoảng trắng.
+        var vanBanMark = vanBan
+            .replace(/([.?!;])\s+/g, '$1\x00')
+            .replace(/\n+/g, '\x00');
+        var cacCau = vanBanMark.split('\x00');
 
         for (var i = 0; i < cacCau.length; i++) {
             var cau = cacCau[i].trim();
@@ -147,6 +160,7 @@
 
         return ketQua;
     }
+
 
     // ============================================================
     // PHẦN 4: TÌM VOICE THEO NGÔN NGỮ (Web Speech API)
@@ -593,5 +607,17 @@
     window.addEventListener('beforeunload', function () {
         dungDocNgay();
     });
+
+    } // end init()
+
+    // ============================================================
+    // KHỞI ĐỘNG: Đợi DOM sẵn sàng rồi mới chạy init()
+    // ============================================================
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        // DOM đã sẵn sàng (script load ở footer)
+        init();
+    }
 
 })();
